@@ -11,7 +11,7 @@
 #include <WiFiUdp.h>
 
 
-WiFiServer server(80);
+WiFiServer server(23);
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -22,12 +22,13 @@ void setup() {
   digitalWrite(12, LOW);
   digitalWrite(14, HIGH);
 
-  Serial.println(WiFi.softAPIP());
+  server.begin();
 }
 
-bool wifiEnabled = false;
 bool networkActive = false;
 long activeTime = 0;
+
+String matrixText = "Stealhead 8176";
 void loop() {
   if (networkActive) {
     Serial.println("Creating Network");
@@ -38,12 +39,37 @@ void loop() {
     while (networkActive) {
       yield(); // this needs to be here so it does not crash!!!!
       if (WiFi.softAPgetStationNum() < 1 && (millis() - activeTime) > 30000) {
-        Serial.println("No Acctivity... Turning off network");
+        Serial.print("No Acctivity... Turning off network... ");
         Serial.println(WiFi.softAPdisconnect(true) ? "Sucess" : "Fail");
         networkActive = false;
         digitalWrite(12, LOW);
         digitalWrite(14, HIGH);
       } else {
+        WiFiClient client = server.available();
+        Serial.println("New Client Connected");
+        
+        while(!client) {
+          yield();
+          delay(1);
+        }
+
+        String req = client.readStringUntil('\r');
+        Serial.println(req);
+        client.flush();
+
+        if(req.indexOf("ChangeString/") != -1) {
+          matrixTest = req.substring(14);
+
+          Serial.print("Requested String... ");
+          Serial.println(matrixTest);
+        }else{
+          Serial.println("Invalid Request");
+        }
+
+        client.flush();
+
+        client.print("The result has been loged");
+        
         Serial.print("Number of devices Connected: ");
         Serial.println(WiFi.softAPgetStationNum());
         delay(2000);
