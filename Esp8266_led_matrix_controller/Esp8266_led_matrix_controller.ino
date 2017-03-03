@@ -9,9 +9,14 @@
 #include <WiFiClientSecure.h>
 #include <WiFiServer.h>
 #include <WiFiUdp.h>
+#include <Wire.h>
+#include "Adafruit_LEDBackpack.h"
+#include "Adafruit_GFX.h"
 
 
 WiFiServer server(23);
+Adafruit_BicolorMatrix matrix = Adafruit_BicolorMatrix();
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
@@ -22,6 +27,13 @@ void setup() {
   digitalWrite(12, LOW);
   digitalWrite(14, HIGH);
 
+  matrix.begin(0x70);
+  matrix.setTextWrap(false);
+  matrix.setTextSize(1);
+  matrix.setTextColor(LED_GREEN);
+  matrix.clear();
+  matrix.writeDisplay();
+  
   server.begin();
 }
 
@@ -46,33 +58,35 @@ void loop() {
         digitalWrite(14, HIGH);
       } else {
         WiFiClient client = server.available();
-        Serial.println("New Client Connected");
-        
-        while(!client) {
-          yield();
-          delay(1);
+
+        if (client) {
+          Serial.println("New Client Connected");
+
+          while (client.connected()) {
+            yield();
+
+            if (client.available()) {
+              String req = client.readStringUntil('\r');
+              Serial.println(req);
+              client.flush();
+
+              if (req.indexOf("/ChangeString/") != -1) {
+                matrixText = req.substring(14);
+
+                Serial.print("Requested String... ");
+                Serial.println(matrixText);
+              } else if (req.indexOf("/Close/") != -1) {
+                client.stop();
+              } else {
+                Serial.println("Invalid Request");
+              }
+
+              client.flush();
+              client.print("The result has been logged");
+              delay(1);
+            }
+          }
         }
-
-        String req = client.readStringUntil('\r');
-        Serial.println(req);
-        client.flush();
-
-        if(req.indexOf("ChangeString/") != -1) {
-          matrixTest = req.substring(14);
-
-          Serial.print("Requested String... ");
-          Serial.println(matrixTest);
-        }else{
-          Serial.println("Invalid Request");
-        }
-
-        client.flush();
-
-        client.print("The result has been loged");
-        
-        Serial.print("Number of devices Connected: ");
-        Serial.println(WiFi.softAPgetStationNum());
-        delay(2000);
       }
     }
   }
@@ -82,5 +96,14 @@ void loop() {
     activeTime = millis();
     digitalWrite(12, HIGH);
     digitalWrite(14, LOW);
+  }
+
+  int stringLength = (matrixText.length()*7);
+  for (int8_t x = 7; x >= -stringLength; x--) {
+    matrix.clear();
+    matrix.setCursor(x, 0);
+    matrix.print(matrixText);
+    matrix.writeDisplay();
+    delay(100);
   }
 }
