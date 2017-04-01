@@ -13,6 +13,11 @@
 #include "Adafruit_LEDBackpack.h"
 #include "Adafruit_GFX.h"
 
+//Define the I/O pins
+#define SDCS 16 // Chip select for the sd card
+#define BUTTON 0 // Tac switch
+#define GREENLED 15
+#define BLUELED 2
 
 WiFiServer server(23);
 Adafruit_BicolorMatrix matrix = Adafruit_BicolorMatrix();
