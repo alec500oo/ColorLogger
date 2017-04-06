@@ -13,12 +13,13 @@
 #include <WiFiUdp.h>
 
 #include <Wire.h>
-#include "Adafruit_LEDBackpack.h"
-#include "Adafruit_GFX.h"
+#include <Adafruit_LEDBackpack.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_TCS34725.h>
 
 //Define the I/O pins
 #define SDCS 16 // Chip select for the sd card
-#define BUTTON 0 // Tac switch
+#define BUTTON 0 // Tac switch, same as Huzzah switch
 #define GREENLED 15
 #define BLUELED 2
 
@@ -31,6 +32,7 @@ enum state {
 WiFiServer server(23);
 WiFiClient client;
 Adafruit_BicolorMatrix matrix = Adafruit_BicolorMatrix();
+Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
 void setup() {
   // put your setup code here, to run once:
@@ -89,6 +91,20 @@ void loop() {
             digitalWrite(BLUELED, LOW);
             digitalWrite(GREENLED, HIGH);
             networkState = NORMAL;
+          } else if (req.indexOf("/EnableColor/") != -1) {
+            if (tcs.begin()) {
+              Serial.println("Color Sensor Active");
+              client.println("Color Sensor Active");
+            } else {
+              Serial.println("Color Sensor Activation Failed");
+              client.println("Color Sensor Activation Failed");
+            }
+          } else if (req.indexOf("/LedOn/") != -1) {
+            //Turn on the color sensor led
+            tcs.setInterrupt(false);
+          } else if (req.indexOf("/LedOff/") != -1) {
+            //Turn off the color sensor led
+            tcs.setInterrupt(true);
           } else {
             client.println("Invalid Request");
             Serial.println("Invalid Request");
