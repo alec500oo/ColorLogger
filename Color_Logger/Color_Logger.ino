@@ -23,10 +23,15 @@
 #define GREENLED 15
 #define BLUELED 2
 
+//Define matrix address
+#define MATRIX_ADDR 0x70
+
 enum state {
   NORMAL,
   NETWORKACTIVE,
-  CLIENTCONNECTED
+  CLIENTCONNECTED,
+  COLORACTIVE,
+  MATRIXACTIVE
 };
 
 WiFiServer server(23);
@@ -34,6 +39,11 @@ WiFiClient client;
 Adafruit_BicolorMatrix matrix = Adafruit_BicolorMatrix();
 Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
+boolean broadcastActive = false;
+
+String username, pass;
+String matrixText = "Hello World";
+int x = 7;
 void setup() {
   // put your setup code here, to run once:
   //Setup serial and the led
@@ -51,6 +61,9 @@ void setup() {
 
 enum state networkState = NORMAL;
 long activeTime = 0;
+long broadcastTime = 0;
+
+uint16_t red, green, blue, clear;
 
 void loop() {
   switch (networkState) {
@@ -80,7 +93,14 @@ void loop() {
           Serial.println(req);
           client.flush();
 
-          if (req.indexOf("/ChangeString/") != -1) {
+          if (req.indexOf("/ConnectToNetwork/") != -1) {
+            String temp = req.substring(18);
+            int passIndex = temp.indexOf("/");
+            username = temp.substring(0, passIndex);
+            pass = temp.substring(passIndex+1);
+            Serial.println(username);
+            Serial.println(pass);
+          } else if (req.indexOf("/ChangeString/") != -1) {
 
           } else if (req.indexOf("/Close/") != -1) {
             client.println("CLOSING CONNECTION");
@@ -91,14 +111,33 @@ void loop() {
             digitalWrite(BLUELED, LOW);
             digitalWrite(GREENLED, HIGH);
             networkState = NORMAL;
+          } else if (req.indexOf("/EnableMatrix/") != 1) { //Enable the led matrix for use and setup scrolling with the deafault string.
+            Serial.print("Enabling led matrix with string: ");
+            Serial.println(matrixText);
+            client.print("Enabling led matrix with string: ");
+            client.println(matrixText);
+
+            matrix.begin(MATRIX_ADDR);
+            matrix.clear();
+            matrix.setTextWrap(false);
+            matrix.setTextSize(1);
+            matrix.setTextColor(LED_RED);
+            broadcastActive = true;
           } else if (req.indexOf("/EnableColor/") != -1) {
             if (tcs.begin()) {
               Serial.println("Color Sensor Active");
               client.println("Color Sensor Active");
+              broadcastActive = true;
+              broadcastTime = millis();
             } else {
               Serial.println("Color Sensor Activation Failed");
               client.println("Color Sensor Activation Failed");
             }
+          } else if (req.indexOf("/StartBroadcast/") != -1) {
+            broadcastActive = true;
+            broadcastTime = millis();
+          } else if (req.indexOf("/StopBroadcast/") != -1) {
+            broadcastActive = false;
           } else if (req.indexOf("/LedOn/") != -1) {
             //Turn on the color sensor led
             tcs.setInterrupt(false);
@@ -112,6 +151,37 @@ void loop() {
         }
       } else {
         networkState = NORMAL;
+      }
+
+      if (!broadcastActive) {
+        break;
+      };
+    case MATRIXACTIVE:
+        if (x >= -77) {
+          matrix.clear();
+          matrix.setCursor(x, 0);
+          matrix.print("Hello");
+          matrix.writeDisplay();
+          x--;
+          delay(100);
+        }else 
+        break;
+    case COLORACTIVE:
+      if ((millis() - broadcastTime) >= 1000) {
+        tcs.getRawData(&red, &green, &blue, &clear);
+        String colorData = String('/');
+        colorData += red;
+        colorData += String(',');
+        colorData += green;
+        colorData += String(',');
+        colorData += blue;
+        colorData += String(',');
+        colorData += clear;
+        colorData += String('/');
+
+        Serial.println(colorData);
+        client.println(colorData);
+        broadcastTime = millis();
       }
       break;
     case NORMAL:
